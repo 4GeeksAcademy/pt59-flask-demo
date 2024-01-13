@@ -137,14 +137,15 @@ def update_recipe(id: int):
         lambda x: x[1].id == id,
         [(idx, rec) for idx, rec in enumerate(recipes)]
     ))
+    
     if not len(selected_recipe):
         return jsonify(message="Recipe not found"), 404
+    
     idx, recipe = selected_recipe.pop()
     data = request.get_json()
     for k, v in data.items():
         setattr(recipe, k, v)
     recipes[idx] = recipe
-
     return jsonify(recipe.serialize())
 
 
