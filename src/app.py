@@ -29,44 +29,73 @@ db.init_app(app)
 CORS(app)
 setup_admin(app)
 
-class Calc:
-    display: float
-    register: float
-    operation: Union[str, None]
-    tape: List[dict]
 
-    def __init__(self) -> None:
-        self.display = 0.0
-        self.register = 0.0
-        self.operation = None
-        self.tape = []
+class Recipe:
+    id: int = 0
+    title: str
+    ingredients: List[str]
+    prep_time: int
+    cook_time: int
+    steps: List[str]
+
+    def __init__(
+            self,
+            title="",
+            ingredients=[],
+            prep_time=0,
+            cook_time=0,
+            steps=[],
+            id=0,
+    ) -> None:
+        self.id = id
+        self.title = title
+        self.ingredients = ingredients
+        self.prep_time = prep_time
+        self.cook_time = cook_time
+        self.steps = steps
 
     def serialize(self):
         return {
-            "display": self.display,
-            "register": self.register,
-            "operation": self.operation,
-            "tape": self.tape,
+            "id": self.id,
+            "title": self.title,
+            "ingredients": self.ingredients,
+            "prep_time": self.prep_time,
+            "cook_time": self.cook_time,
+            "steps": self.steps,
         }
-    
-    def perform_operation(self):
-        match(self.operation):
-            case "addition":
-                result = self.register + self.display
-                self.tape.append({
-                    "display": self.display,
-                    "register": self.register,
-                    "operation": self.operation,
-                    "result": result
-                })
-                self.display = result
-                self.register = 0.0
-            case _:
-                return
-        self.operation = None
 
 
-calc = Calc()
+recipes = [
+    Recipe(
+        id=1,
+        title="Chocolate Chip Cookies",
+        ingredients=[
+            "1/2 c. chocolate chips",
+            "3 1/2 c. all purpose flour",
+            "1 stick soft butter",
+            "2 large eggs",
+            "1/2 tsp. baking powder",
+            "1/2 c. white sugar",
+            "1/2 c. brown sugar",
+            "1 tsp vanilla extract",
+            "1/2 tsp. salt",
+        ],
+        prep_time=20,
+        cook_time=15,
+        steps=[]
+    ),
+    Recipe(
+        id=2,
+        title="Fritatta",
+        ingredients=[
+            "eggs",
+            "cheese",
+            "asst. diced veggies",
+            "milk",
+        ]
+    )
+]
+
 
 # Handle/serialize errors like a JSON object
 
@@ -83,47 +112,40 @@ def sitemap():
     return generate_sitemap(app)
 
 
-@app.route('/user', methods=['GET'])
-def handle_hello():
-
-    response_body = {
-        "msg": "Hello, this is your GET /user response "
-    }
-
-    return jsonify(response_body), 200
+@app.route("/recipes", methods=["GET"])
+def get_all_recipes():
+    json_recipes = [recipe.serialize() for recipe in recipes]
+    return jsonify(recipes=json_recipes)
 
 
-@app.route("/helloworld", methods=["GET"])
-def hello_world():
-    return jsonify(hello="world"), 418
+@app.route("/recipes/<int:id>", methods=["GET"])
+def get_single_recipe(id: int):
+    selected_recipe = list(filter(
+        # (recipe) => recipe.id === id
+        lambda recipe: recipe.id == id,
+        recipes
+    ))
+    if not len(selected_recipe):
+        return jsonify(message="Recipe not found"), 404
+    return jsonify(selected_recipe.pop().serialize())
 
 
-# Calculator app
+@app.route("/recipes/<int:id>", methods=["PUT", "PATCH"])
+def update_recipe(id: int):
+    selected_recipe = list(filter(
+        # (recipe) => recipe.id === id
+        lambda x: x[1].id == id,
+        [(idx, rec) for idx, rec in enumerate(recipes)]
+    ))
+    if not len(selected_recipe):
+        return jsonify(message="Recipe not found"), 404
+    idx, recipe = selected_recipe.pop()
+    data = request.get_json()
+    for k, v in data.items():
+        setattr(recipe, k, v)
+    recipes[idx] = recipe
 
-@app.route("/calculator", methods=["GET"])
-def get_calc():
-    return jsonify(calc.serialize())
-
-
-@app.route("/calculator", methods=["PUT"])
-def change_calc_value():
-    data = request.json
-    # This is minor magic
-    for k,v in data.items():
-        setattr(calc, k, v)
-    return jsonify(calc.serialize())
-
-
-@app.route("/calculator", methods=["POST"])
-def complete_op():
-    calc.perform_operation()
-    return jsonify(calc.serialize())
-
-
-@app.route("/calculator", methods=["DELETE"])
-def ce():
-    calc = Calc()
-    return jsonify(calc.serialize())
+    return jsonify(recipe.serialize())
 
 
 # this only runs if `$ python src/app.py` is executed
